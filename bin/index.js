@@ -51,6 +51,12 @@ const options = yargs
             type: "boolean", 
             demandOption: false, 
         },
+        "w": {
+          alias:"wipe", 
+          describe: "Removes all the auto-compiled javascript files in ./ts-utils; More accurately, it removes/unlinks all the files ending in .js",
+          type: "boolean", 
+          demandOption: false, 
+        }
       })      
       .help(true)  
       .argv;
@@ -103,4 +109,14 @@ if (yargs.argv.f || yargs.argv.fix) {
         })
     }
 
+}
+
+if (yargs.argv.w || yargs.argv.wipe) {
+    let tsUtilsDir = cwd + "/ts-utils/"
+    fs.readdir(tsUtilsDir, (err, files) => {
+      if (err) throw err 
+      for (const file of files) 
+        if (file.includes(".js")) 
+          fs.unlink(tsUtilsDir + file, (err) => {if (err) throw err })
+    })
 }
