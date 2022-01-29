@@ -41,7 +41,7 @@ const options = yargs
       .options({
         "f": {
             alias:"fix", 
-            describe: "Fixes a compiled javascript file so its compatible with javascript. This requires a ts-utils folder (with typescript & its compiled javascript) and a utils folder (only has the web compatible javascript). \nExample: juf -fix rgba\nEntering this command will make it search for ./ts-utils/rgba.js, fix it, then write the fixed version to ./utils/rgba.js. if -r flag is added, ./ts-utils/rgba.js is removed.\nNOTE: in the utils folder, a line with `//jufSAVE` alone MUST be present. That and every line under it will be saved when the command is ran.", 
+            describe: "Fixes a compiled javascript file so its compatible with javascript. This requires a ts-utils folder (with typescript & its compiled javascript) and a utils folder (only has the web compatible javascript). \nExample: juf -fix rgba\nEntering this command will make it search for ./ts-utils/rgba.js, fix it, then write the fixed version to ./utils/rgba.js. if -r flag is added, ./ts-utils/rgba.js is removed.\nIf you want to select a file nested within a directory, simply type 'directory/fileName' and the code will select 'ts-utils/directory/fileName.js' and 'utils/fileName.js' \nNOTE: in the utils folder, a line with `//jufSAVE` alone MUST be present. That and every line under it will be saved when the command is ran.", 
             type: "boolean", 
             demandOption: false, 
         },
@@ -53,7 +53,7 @@ const options = yargs
         },
         "w": {
           alias:"wipe", 
-          describe: "Removes all the auto-compiled javascript files in ./ts-utils; More accurately, it removes/unlinks all the files ending in .js",
+          describe: "Removes all the auto-compiled javascript files in ./ts-utils; More accurately, it removes/unlinks all the files ending in .js. Folders nested within /ts-utils that end with .js will also get targeted for deletion.",
           type: "boolean", 
           demandOption: false, 
         }
@@ -70,6 +70,10 @@ if (yargs.argv.f || yargs.argv.fix) {
     let keyword = yargs.argv._[0]
     let compiledJavascriptDir = cwd + "/ts-utils/" + keyword + ".js"
     let jsUtilsJsDir = cwd + "/utils/" + keyword + ".js"
+    if (keyword.includes("/")) {
+      let splitKeyword = keyword.split("/")
+      jsUtilsJsDir = cwd + "/utils/" + splitKeyword[splitKeyword.length - 1] + ".js"
+    }
 
     fs.readFile(compiledJavascriptDir, "utf8", (err, data) => {
         if (err) throw err 
@@ -113,10 +117,32 @@ if (yargs.argv.f || yargs.argv.fix) {
 
 if (yargs.argv.w || yargs.argv.wipe) {
     let tsUtilsDir = cwd + "/ts-utils/"
-    fs.readdir(tsUtilsDir, (err, files) => {
-      if (err) throw err 
-      for (const file of files) 
-        if (file.includes(".js")) 
-          fs.unlink(tsUtilsDir + file, (err) => {if (err) throw err })
-    })
+
+    unlinkAllJsInFolder(tsUtilsDir)
+
+}
+
+function unlinkAllJsInFolder(dir) {
+
+  fs.readdir(dir, (err, files) => {
+    if (err) throw err 
+    
+    // console.log("DIR:" + dir)
+    // console.log("FILES: " + files.join(" "))
+
+    for (const file of files)  {
+      if (file.includes(".js")) {
+        fs.unlink(dir + file, (err) => {
+          if (err) throw err
+        })
+
+      }
+      else if (!file.includes(".")) {
+        // console.log("recursive " + file)
+        unlinkAllJsInFolder(dir + file + "/")
+      }
+    }
+  })
+
+
 }
