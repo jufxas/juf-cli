@@ -24,11 +24,6 @@ function codeFixer(Code) {
   return code
 }
 
-/* 
-**
-**
-**
-*/
 
 const yargs = require("yargs"); 
 const usage = "\nUsage: juf -f <Optional: -r> <file name without dot, e.g., main>";
@@ -56,12 +51,16 @@ const options = yargs
           describe: "Removes all the auto-compiled javascript files in ./ts-utils; More accurately, it removes/unlinks all the files ending in .js. Folders nested within /ts-utils that end with .js will also get targeted for deletion.",
           type: "boolean", 
           demandOption: false, 
+        },
+        "c": {
+          alias:"remove_coq",
+          describe: "Removes files that are not .v or .vscode from cwd; add function 'KEEP' followed by filename(s) or filetype(s) to not remove certain files; e.g., 'juf -c KEEP .c main.java'-removes all files except .v, .vscode, .c, and main.java\nAdd keyword LOG_SAVE after KEEP(args) to log all files saved\nAdd keyword LOG_RM after KEEP(args) to log all files removed\nAdd keyword UNEXEC to prevent file removing\nPattern: juf [-c or -remove_coq] [optional function KEEP] [conditional args for KEEP filename (main.java) or filetype (.java)] [optional keyword LOG_RM] [optional keyword LOG_SAVE] [optional keyword UNEXEC]",
+          type: "boolean", 
+          demandOption: false, 
         }
       })      
       .help(true)  
       .argv;
-
-// console.log(yargs.argv)
 
 
 if (yargs.argv.f || yargs.argv.fix) {
@@ -119,6 +118,65 @@ if (yargs.argv.w || yargs.argv.wipe) {
     let tsUtilsDir = cwd + "/ts-utils/"
 
     unlinkAllJsInFolder(tsUtilsDir)
+
+}
+
+if (yargs.argv.c || yargs.argv.remove_coq) {
+  // examples of valid input 
+  // juf -c 
+  // juf -c KEEP types.vos UNEXEC 
+  // juf -c KEEP types.vos .glob LOG_RM  
+  // juf [-c or -remove_coq] [optional function KEEP] [conditional args for KEEP filename (main.java) or filetype (.java)] [optional keyword LOG_RM] [optional keyword LOG_SAVE] [optional keyword UNEXEC]
+  // KEEP must come before optional keywords LOG_RM, LOG_SAVE, or UNEXEC 
+
+  let saved = []
+  if (yargs.argv._[0] == "KEEP") saved = yargs.argv._.slice(1)
+
+  let logSaved = yargs.argv._.some(x => x == "LOG_SAVED")
+  let logRm = yargs.argv._.some(x => x == "LOG_RM")
+  let doNotExecute = yargs.argv._.some(x => x == "UNEXEC")
+
+  // list of criteria a filename must at least have one of in order to be saved 
+  let criteria = [
+    x => x.slice(x.length - 2, x.length) == ".v", // last two chars is .v 
+    x => x == ".vscode" // file is .vscode 
+  ]
+  
+  
+  for (const fileNameOrExt of saved) {
+    if (fileNameOrExt == "LOG_SAVED" || fileNameOrExt == "LOG_RM" || fileNameOrExt == "UNEXEC") {}
+    else if (fileNameOrExt[0] == ".") 
+      criteria.push(x => x.slice(x.length - fileNameOrExt.length, x.length) == fileNameOrExt)
+    else
+      criteria.push(x => x == fileNameOrExt)
+    
+  }
+
+  
+  fs.readdir(cwd, (err, files) => {
+    if (err) throw err 
+
+    let saved = []
+    let removed = []
+
+    for (const file of files) {
+      let deleteThis = true 
+
+      for (const func of criteria)
+        if (func(file)) { if (logSaved) saved.push(file) ; deleteThis = false; break } 
+      
+      if (deleteThis) { removed.push(file) }
+
+    }
+
+    if (logSaved) for (const file of saved) console.log('SAVE:',file)
+    if (logRm) for (const file of removed) console.log('REMOVE:',file)
+
+    if (!doNotExecute) 
+      for (const file of removed) 
+        fs.unlink(cwd + "/" + file, (err) => { if (err) throw err })
+
+  })
 
 }
 
